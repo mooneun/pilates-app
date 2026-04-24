@@ -41,6 +41,8 @@
   .badge-full{background:#FCEBEB;color:#A32D2D;}
   .badge-avail{background:#E1F5EE;color:#0F6E56;}
   .badge-closed{background:#FCEBEB;color:#A32D2D;}
+  .badge-confirmed{background:#EAF3DE;color:#27500A;}
+  .badge-waiting{background:#FAEEDA;color:#854F0B;}
   .del-btn{background:none;border:none;color:#bbb;cursor:pointer;font-size:13px;padding:2px 8px;border-radius:6px;font-family:inherit;}
   .del-btn:hover{color:#e24b4a;background:#FCEBEB;}
   .applicants{border-top:1px solid #f0f0f0;padding-top:10px;display:flex;flex-direction:column;gap:8px;}
@@ -72,9 +74,25 @@
   .done-desc{font-size:14px;color:#888;line-height:1.7;}
   .loading{text-align:center;padding:40px;color:#aaa;font-size:14px;}
   .empty{text-align:center;padding:32px;color:#aaa;font-size:14px;}
+
+  /* 내 신청 조회 */
+  .lookup-box{background:#fff;border:1px solid #e8e4de;border-radius:14px;padding:16px 18px;margin-bottom:16px;}
+  .lookup-row{display:flex;gap:8px;}
+  .lookup-row input{flex:1;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;outline:none;}
+  .lookup-row input:focus{border-color:#6B5CE7;}
+  .lookup-btn{padding:10px 18px;background:#6B5CE7;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .my-result-card{border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid #e8e4de;background:#fff;}
+  .my-result-card.confirmed{border-color:#639922;background:#EAF3DE;}
+  .my-result-card.waiting{border-color:#EF9F27;background:#FAEEDA;}
+  .my-result-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+  .my-result-date{font-size:15px;font-weight:700;}
+  .my-result-time{font-size:13px;color:#888;margin-top:2px;}
+  .cancel-btn{background:none;border:1px solid #ddd;color:#888;cursor:pointer;font-size:12px;padding:4px 10px;border-radius:6px;font-family:inherit;}
+  .cancel-btn:hover{color:#e24b4a;border-color:#e24b4a;}
+
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;color:#fff;padding:10px 22px;border-radius:99px;font-size:13px;transition:transform 0.25s;pointer-events:none;white-space:nowrap;z-index:99;}
   .toast.show{transform:translateX(-50%) translateY(0);}
-  @media(max-width:480px){.form-grid{flex-direction:column;}.form-row{flex-direction:column;}}
+  @media(max-width:480px){.form-grid{flex-direction:column;}.form-row{flex-direction:column;}.lookup-row{flex-direction:column;}}
 </style>
 </head>
 <body>
@@ -83,6 +101,8 @@
     <div class="logo">Pila<span>Fit</span></div>
     <div class="mode-badge" id="modeBadge"></div>
   </div>
+
+  <!-- 관리자 화면 -->
   <div id="adminView" style="display:none;">
     <div class="tabs">
       <button class="tab on" id="tabSlots" onclick="adminTab('slots')">일정 관리</button>
@@ -111,12 +131,30 @@
       <div id="applicantList"><div class="loading">불러오는 중...</div></div>
     </div>
   </div>
+
+  <!-- 지인 화면 -->
   <div id="guestView" style="display:none;">
     <div class="guest-header">
       <div class="guest-title">필라테스 수업 신청</div>
       <div class="guest-sub">원하는 날짜를 선택하고<br>이름과 연락처를 남겨주세요</div>
     </div>
-    <div id="guestContent"><div class="loading">일정 불러오는 중...</div></div>
+    <div class="tabs">
+      <button class="tab on" id="gTabApply" onclick="guestTab('apply')">수업 신청</button>
+      <button class="tab" id="gTabMypage" onclick="guestTab('mypage')">내 신청 조회</button>
+    </div>
+    <div id="guestApply">
+      <div id="guestContent"><div class="loading">일정 불러오는 중...</div></div>
+    </div>
+    <div id="guestMypage" style="display:none;">
+      <div class="lookup-box">
+        <div class="card-title" style="margin-bottom:10px;">전화번호로 신청 내역 조회</div>
+        <div class="lookup-row">
+          <input type="tel" id="lookupPhone" placeholder="010-0000-0000">
+          <button class="lookup-btn" onclick="lookupMyBookings()">조회</button>
+        </div>
+      </div>
+      <div id="myBookingResult"></div>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -174,8 +212,9 @@ function initView() {
 }
 
 function listenSlots(mode) {
-  db.collection('slots').orderBy('date').orderBy('time').onSnapshot(function(snap) {
+  db.collection('slots').orderBy('date').onSnapshot(function(snap) {
     cachedSlots = snap.docs.map(function(d) { return Object.assign({id: d.id}, d.data()); });
+    cachedSlots.sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
     if (mode === 'admin') {
       renderAdminSlots(cachedSlots);
       renderApplicants(cachedSlots);
@@ -198,7 +237,7 @@ function renderAdminSlots(slots) {
     const badgeTxt = cnt === 0 ? '신청 없음' : '신청 ' + cnt + '/' + s.max;
     const appRows = cnt === 0
       ? '<div class="no-applicant">아직 신청자가 없어요</div>'
-      : (s.applicants || []).map(function(a, i) {
+      : (s.applicants || []).map(function(a) {
           const confirmed = (s.confirmed || []).includes(a.name);
           return '<div class="applicant-row"><div><div class="applicant-name">' + a.name + '</div><div class="applicant-phone">' + a.phone + '</div></div>'
             + '<button class="confirm-btn ' + (confirmed ? 'confirm-on' : 'confirm-off') + '" onclick="toggleConfirm(\'' + s.id + '\',\'' + a.name + '\')">' + (confirmed ? '확정됨' : '확정하기') + '</button></div>';
@@ -219,8 +258,8 @@ function renderApplicants(slots) {
       const confirmed = (s.confirmed||[]).includes(a.name);
       return '<div class="slot-card"><div class="slot-head"><div><div class="applicant-name" style="font-size:15px;">' + a.name + '</div>'
         + '<div class="applicant-phone">' + a.phone + '</div></div>'
-        + '<span class="badge ' + (confirmed ? 'badge-has' : 'badge-empty') + '">' + (confirmed ? '확정' : '대기') + '</span></div>'
-        + '<div style="font-size:13px;color:#888;margin-top:4px;">' + fmt(s.date) + ' ' + s.time + '</div></div>';
+        + '<span class="badge ' + (confirmed ? 'badge-confirmed' : 'badge-waiting') + '">' + (confirmed ? '확정' : '대기') + '</span></div>'
+        + '<div style="font-size:13px;color:#888;margin-top:6px;">' + fmt(s.date) + ' ' + s.time + '</div></div>';
     }).join('');
   }).join('');
 }
@@ -228,13 +267,12 @@ function renderApplicants(slots) {
 function renderGuestView(slots) {
   const el = document.getElementById('guestContent');
   if (guestDone) {
-    el.innerHTML = '<div class="done-box"><div class="done-circle"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B5CE7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="done-title">신청 완료!</div><div class="done-desc">강사님이 일정 확인 후<br>연락드릴 거예요 😊</div></div>';
+    el.innerHTML = '<div class="done-box"><div class="done-circle"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B5CE7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div><div class="done-title">신청 완료!</div><div class="done-desc">강사님이 일정 확인 후<br>연락드릴 거예요 😊<br><br><span style="font-size:13px;color:#aaa;">내 신청 확인은 상단 탭에서 조회하세요</span></div></div>';
     return;
   }
   const today = new Date().toISOString().split('T')[0];
   const future = slots.filter(function(s){ return s.date >= today; });
   if (!future.length) { el.innerHTML = '<div class="empty">현재 신청 가능한 일정이 없어요</div>'; return; }
-
   const optHtml = future.map(function(s) {
     const cnt = (s.applicants||[]).length;
     const full = cnt >= s.max;
@@ -243,7 +281,6 @@ function renderGuestView(slots) {
       + '<div><div class="slot-opt-date">' + fmt(s.date) + '</div><div class="slot-opt-time">' + s.time + '</div></div>'
       + '<span class="badge ' + (full ? 'badge-closed' : 'badge-avail') + '">' + (full ? '마감' : '신청 가능') + '</span></div>';
   }).join('');
-
   el.innerHTML = '<div style="margin-bottom:8px;font-size:14px;font-weight:500;color:#555;">일정 선택</div>'
     + optHtml
     + '<div class="guest-form" style="margin-top:16px;"><div class="card-title">내 정보 입력</div>'
@@ -251,6 +288,52 @@ function renderGuestView(slots) {
     + '<div class="field"><label>연락처</label><input type="tel" id="gPhone" placeholder="010-0000-0000"></div></div>'
     + '<button class="submit-btn" onclick="submitGuest()">신청하기</button></div>';
 }
+
+// 내 신청 조회
+window.lookupMyBookings = function() {
+  const phone = document.getElementById('lookupPhone').value.trim();
+  if (!phone) { showToast('전화번호를 입력해주세요'); return; }
+  const el = document.getElementById('myBookingResult');
+  const matched = [];
+  cachedSlots.forEach(function(s) {
+    (s.applicants||[]).forEach(function(a) {
+      if (a.phone === phone) {
+        const confirmed = (s.confirmed||[]).includes(a.name);
+        matched.push({ slot: s, name: a.name, confirmed: confirmed });
+      }
+    });
+  });
+  if (!matched.length) {
+    el.innerHTML = '<div class="empty">해당 연락처로 신청된 내역이 없어요</div>';
+    return;
+  }
+  el.innerHTML = matched.map(function(m) {
+    const cls = m.confirmed ? 'confirmed' : 'waiting';
+    const badgeCls = m.confirmed ? 'badge-confirmed' : 'badge-waiting';
+    const badgeTxt = m.confirmed ? '✓ 확정됨' : '대기 중';
+    return '<div class="my-result-card ' + cls + '">'
+      + '<div class="my-result-head"><div><div class="my-result-date">' + fmt(m.slot.date) + '</div><div class="my-result-time">' + m.slot.time + '</div></div>'
+      + '<span class="badge ' + badgeCls + '">' + badgeTxt + '</span></div>'
+      + '<div style="font-size:13px;color:#666;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08);">신청자: ' + m.name + '</div>'
+      + '<div style="margin-top:8px;"><button class="cancel-btn" onclick="cancelBooking(\'' + m.slot.id + '\',\'' + m.name + '\',\'' + phone + '\')">신청 취소</button></div>'
+      + '</div>';
+  }).join('');
+};
+
+// 신청 취소
+window.cancelBooking = function(slotId, name, phone) {
+  if (!confirm('신청을 취소할까요?')) return;
+  const slot = cachedSlots.find(function(s){ return s.id === slotId; });
+  if (!slot) return;
+  const applicants = (slot.applicants||[]).filter(function(a){ return !(a.name === name && a.phone === phone); });
+  const confirmed = (slot.confirmed||[]).filter(function(n){ return n !== name; });
+  db.collection('slots').doc(slotId).update({ applicants: applicants, confirmed: confirmed })
+    .then(function(){
+      showToast('신청이 취소됐어요');
+      document.getElementById('myBookingResult').innerHTML = '<div class="empty">신청이 취소됐어요</div>';
+    })
+    .catch(function(e){ showToast('오류: ' + e.message); });
+};
 
 window.addSlot = function() {
   const date = document.getElementById('inpDate').value;
@@ -304,6 +387,13 @@ window.adminTab = function(tab) {
   document.getElementById('tabApplicants').classList.toggle('on', tab === 'applicants');
   document.getElementById('adminSlots').style.display = tab === 'slots' ? 'block' : 'none';
   document.getElementById('adminApplicants').style.display = tab === 'applicants' ? 'block' : 'none';
+};
+
+window.guestTab = function(tab) {
+  document.getElementById('gTabApply').classList.toggle('on', tab === 'apply');
+  document.getElementById('gTabMypage').classList.toggle('on', tab === 'mypage');
+  document.getElementById('guestApply').style.display = tab === 'apply' ? 'block' : 'none';
+  document.getElementById('guestMypage').style.display = tab === 'mypage' ? 'block' : 'none';
 };
 
 window.copyGuestLink = function() {

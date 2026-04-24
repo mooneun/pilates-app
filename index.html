@@ -176,7 +176,7 @@ const db = firebase.firestore();
 const weekdays = ['일','월','화','수','목','금','토'];
 const params = new URLSearchParams(window.location.search);
 const isAdmin = params.get('mode') === 'admin';
-const ADMIN_PW = 'pilates2024';
+const ADMIN_PW_HASH = '644374e8853580c452630c8a9072f7ebc9ff4c56785e8395ae4e92adc21bcf2e';
 let selectedSlotId = null;
 let guestDone = false;
 let cachedSlots = [];
@@ -197,12 +197,23 @@ document.getElementById('inpDate').value = new Date().toISOString().split('T')[0
 function initView() {
   if (isAdmin) {
     const pw = prompt('관리자 비밀번호를 입력하세요:');
-    if (pw !== ADMIN_PW) { alert('비밀번호가 틀렸습니다.'); window.location.href = window.location.pathname; return; }
-    document.getElementById('adminView').style.display = 'block';
-    document.getElementById('modeBadge').textContent = '강사 관리자';
-    document.getElementById('modeBadge').className = 'mode-badge mode-admin';
-    document.getElementById('guestLinkDisplay').textContent = window.location.origin + window.location.pathname;
-    listenSlots('admin');
+    if (!pw) { window.location.href = window.location.pathname; return; }
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pw);
+    crypto.subtle.digest('SHA-256', data).then(function(hashBuffer) {
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+      if (hashHex !== ADMIN_PW_HASH) {
+        alert('비밀번호가 틀렸습니다.');
+        window.location.href = window.location.pathname;
+        return;
+      }
+      document.getElementById('adminView').style.display = 'block';
+      document.getElementById('modeBadge').textContent = '강사 관리자';
+      document.getElementById('modeBadge').className = 'mode-badge mode-admin';
+      document.getElementById('guestLinkDisplay').textContent = window.location.origin + window.location.pathname;
+      listenSlots('admin');
+    });
   } else {
     document.getElementById('guestView').style.display = 'block';
     document.getElementById('modeBadge').textContent = '수업 신청';

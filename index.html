@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>필라테스 수업 예약</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Noto Sans KR',sans-serif;background:#f8f7f5;color:#1a1a1a;min-height:100vh;}
+  a{text-decoration:none;}
+
+  .app{max-width:600px;margin:0 auto;padding:0 16px 60px;}
+
+  /* 헤더 */
+  .header{padding:24px 0 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8e4de;margin-bottom:24px;}
+  .logo{font-size:20px;font-weight:700;letter-spacing:-0.5px;}
+  .logo span{color:#6B5CE7;}
+  .mode-badge{font-size:12px;padding:4px 12px;border-radius:99px;font-weight:500;}
+  .mode-admin{background:#EEF0FF;color:#534AB7;}
+  .mode-guest{background:#E1F5EE;color:#0F6E56;}
+
+  /* 탭 */
+  .tabs{display:flex;background:#eee;border-radius:10px;padding:3px;margin-bottom:20px;}
+  .tab{flex:1;padding:8px;text-align:center;font-size:14px;font-weight:500;border-radius:8px;cursor:pointer;border:none;background:transparent;color:#888;font-family:inherit;transition:all 0.15s;}
+  .tab.on{background:#fff;color:#1a1a1a;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+
+  /* 공유 링크 박스 */
+  .link-box{background:#EEF0FF;border:1px solid #AFA9EC;border-radius:12px;padding:14px 16px;margin-bottom:20px;}
+  .link-label{font-size:11px;color:#534AB7;font-weight:700;margin-bottom:6px;letter-spacing:0.5px;}
+  .link-row{display:flex;align-items:center;gap:8px;}
+  .link-url{flex:1;font-size:12px;color:#3C3489;word-break:break-all;font-family:monospace;background:#fff;border:1px solid #AFA9EC;border-radius:6px;padding:6px 10px;}
+  .copy-btn{padding:6px 14px;background:#6B5CE7;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:inherit;}
+
+  /* 슬롯 추가 폼 */
+  .card{background:#fff;border:1px solid #e8e4de;border-radius:14px;padding:16px 18px;margin-bottom:12px;}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:14px;color:#1a1a1a;}
+  .form-grid{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11px;color:#888;font-weight:500;}
+  .field input,.field select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:#1a1a1a;outline:none;}
+  .field input:focus{border-color:#6B5CE7;}
+  .add-btn{padding:9px 18px;background:#6B5CE7;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;}
+  .add-btn:hover{background:#5a4dd4;}
+
+  /* 슬롯 카드 */
+  .slot-card{background:#fff;border:1px solid #e8e4de;border-radius:14px;padding:16px 18px;margin-bottom:10px;}
+  .slot-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .slot-datetime{font-size:16px;font-weight:700;}
+  .slot-meta{display:flex;gap:8px;align-items:center;}
+  .badge{font-size:12px;padding:3px 10px;border-radius:99px;font-weight:500;}
+  .badge-empty{background:#f0f0f0;color:#888;}
+  .badge-has{background:#EEF0FF;color:#534AB7;}
+  .badge-full{background:#FCEBEB;color:#A32D2D;}
+  .del-btn{background:none;border:none;color:#bbb;cursor:pointer;font-size:13px;padding:2px 8px;border-radius:6px;font-family:inherit;}
+  .del-btn:hover{color:#e24b4a;background:#FCEBEB;}
+  .applicants{border-top:1px solid #f0f0f0;padding-top:10px;display:flex;flex-direction:column;gap:8px;}
+  .applicant-row{display:flex;justify-content:space-between;align-items:center;}
+  .applicant-info{display:flex;flex-direction:column;}
+  .applicant-name{font-size:14px;font-weight:500;}
+  .applicant-phone{font-size:12px;color:#888;}
+  .confirm-btn{padding:4px 12px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all 0.15s;}
+  .confirm-btn.off{background:#f0f0f0;color:#666;}
+  .confirm-btn.on{background:#27500A;color:#fff;}
+  .no-applicant{font-size:13px;color:#aaa;text-align:center;padding:8px 0;}
+
+  /* 지인 화면 */
+  .guest-header{text-align:center;padding:8px 0 20px;}
+  .guest-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+  .guest-sub{font-size:14px;color:#888;line-height:1.6;}
+
+  .slot-option{background:#fff;border:1px solid #e8e4de;border-radius:14px;padding:14px 18px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;}
+  .slot-option:hover{border-color:#AFA9EC;}
+  .slot-option.selected{border-color:#6B5CE7;background:#EEF0FF;}
+  .slot-option.full{opacity:0.4;cursor:not-allowed;}
+  .slot-opt-date{font-size:15px;font-weight:700;margin-bottom:2px;}
+  .slot-opt-time{font-size:13px;color:#888;}
+  .badge-avail{background:#E1F5EE;color:#0F6E56;}
+  .badge-closed{background:#FCEBEB;color:#A32D2D;}
+
+  .guest-form{background:#fff;border:1px solid #e8e4de;border-radius:14px;padding:16px 18px;margin-bottom:12px;}
+  .form-row{display:flex;gap:10px;margin-bottom:12px;}
+  .form-row .field{flex:1;}
+  .form-row .field input{width:100%;}
+  .submit-btn{width:100%;padding:13px;background:#6B5CE7;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity 0.15s;}
+  .submit-btn:hover{opacity:0.88;}
+  .submit-btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+  /* 완료 */
+  .done-box{background:#fff;border:1px solid #e8e4de;border-radius:14px;padding:40px 20px;text-align:center;}
+  .done-circle{width:60px;height:60px;background:#EEF0FF;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
+  .done-title{font-size:20px;font-weight:700;margin-bottom:8px;}
+  .done-desc{font-size:14px;color:#888;line-height:1.7;}
+
+  /* 로딩 */
+  .loading{text-align:center;padding:40px;color:#aaa;font-size:14px;}
+  .empty{text-align:center;padding:32px;color:#aaa;font-size:14px;}
+
+  /* 토스트 */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;color:#fff;padding:10px 22px;border-radius:99px;font-size:13px;transition:transform 0.25s;pointer-events:none;white-space:nowrap;z-index:99;font-family:'Noto Sans KR',sans-serif;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+
+  @media(max-width:480px){
+    .form-grid{flex-direction:column;}
+    .form-row{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">Pila<span>Fit</span></div>
+    <div class="mode-badge" id="modeBadge"></div>
+  </div>
+
+  <!-- 관리자 화면 -->
+  <div id="adminView" style="display:none;">
+    <div class="tabs">
+      <button class="tab on" onclick="adminTab('slots')">일정 관리</button>
+      <button class="tab" onclick="adminTab('applicants')">신청 현황</button>
+    </div>
+
+    <div id="adminSlots">
+      <div class="link-box">
+        <div class="link-label">지인 공유 링크</div>
+        <div class="link-row">
+          <div class="link-url" id="guestLinkDisplay"></div>
+          <button class="copy-btn" onclick="copyGuestLink()">복사</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">새 일정 추가</div>
+        <div class="form-grid">
+          <div class="field"><label>날짜</label><input type="date" id="inpDate"></div>
+          <div class="field"><label>시간</label><input type="time" id="inpTime" value="10:00"></div>
+          <div class="field"><label>최대 인원</label><input type="number" id="inpMax" value="1" min="1" max="10" style="width:70px;"></div>
+          <button class="add-btn" onclick="addSlot()">+ 추가</button>
+        </div>
+      </div>
+
+      <div id="adminSlotList"><div class="loading">불러오는 중...</div></div>
+    </div>
+
+    <div id="adminApplicants" style="display:none;">
+      <div id="applicantList"><div class="loading">불러오는 중...</div></div>
+    </div>
+  </div>
+
+  <!-- 지인 화면 -->
+  <div id="guestView" style="display:none;">
+    <div class="guest-header">
+      <div class="guest-title">필라테스 수업 신청</div>
+      <div class="guest-sub">원하는 날짜를 선택하고<br>이름과 연락처를 남겨주세요</div>
+    </div>
+    <div id="guestContent"><div class="loading">일정 불러오는 중...</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ★ Firebase 설정 (본인 값으로 교체)
+const firebaseConfig = {
+  apiKey: "AIzaSyBSVcayf68ZokgasmsOyUqw3Ohw0Yl1CRg",
+  authDomain: "my-pliates-reserve.firebaseapp.com",
+  projectId: "my-pliates-reserve",
+  storageBucket: "my-pliates-reserve.firebasestorage.app",
+  messagingSenderId: "774298531992",
+  appId: "1:774298531992:web:fb0eeb6a5293513a3bb8ed"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const weekdays = ['일','월','화','수','목','금','토'];
+
+// URL 파라미터로 관리자/지인 구분
+const params = new URLSearchParams(window.location.search);
+const isAdmin = params.get('mode') === 'admin';
+// 관리자 비밀번호 (간단 보호)
+const ADMIN_PW = 'pilates2024';
+
+function fmt(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// 관리자 진입 시 비밀번호 확인
+function checkAdmin() {
+  if (isAdmin) {
+    const pw = prompt('관리자 비밀번호를 입력하세요:');
+    if (pw !== ADMIN_PW) {
+      alert('비밀번호가 틀렸습니다.');
+      window.location.href = window.location.pathname;
+      return false;
+    }
+  }
+  return true;
+}
+
+// 뷰 초기화
+function initView() {
+  if (isAdmin) {
+    if (!checkAdmin()) return;
+    document.getElementById('adminView').style.display = 'block';
+    document.getElementById('modeBadge').textContent = '강사 관리자';
+    document.getElementById('modeBadge').className = 'mode-badge mode-admin';
+    const guestUrl = window.location.origin + window.location.pathname;
+    document.getElementById('guestLinkDisplay').textContent = guestUrl;
+    loadAdminSlots();
+  } else {
+    document.getElementById('guestView').style.display = 'block';
+    document.getElementById('modeBadge').textContent = '수업 신청';
+    document.getElementById('modeBadge').className = 'mode-badge mode-guest';
+    loadGuestSlots();
+  }
+}
+
+// 오늘 날짜 기본값
+document.getElementById('inpDate').value = new Date().toISOString().split('T')[0];
+
+// ── 관리자: 슬롯 불러오기
+async function loadAdminSlots() {
+  const q = query(collection(db, 'slots'), orderBy('date'), orderBy('time'));
+  onSnapshot(q, (snap) => {
+    const slots = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    renderAdminSlots(slots);
+    renderApplicants(slots);
+  });
+}
+
+function renderAdminSlots(slots) {
+  const el = document.getElementById('adminSlotList');
+  if (!slots.length) { el.innerHTML = '<div class="empty">등록된 일정이 없어요. 위에서 추가해보세요!</div>'; return; }
+  el.innerHTML = slots.map(s => {
+    const cnt = (s.applicants || []).length;
+    const full = cnt >= s.max;
+    const badgeCls = cnt === 0 ? 'badge-empty' : full ? 'badge-full' : 'badge-has';
+    const badgeTxt = cnt === 0 ? '신청 없음' : `신청 ${cnt}/${s.max}`;
+    const appRows = cnt === 0
+      ? '<div class="no-applicant">아직 신청자가 없어요</div>'
+      : (s.applicants || []).map((a, i) => {
+          const confirmed = (s.confirmed || []).includes(a.name);
+          return `<div class="applicant-row">
+            <div class="applicant-info">
+              <span class="applicant-name">${a.name}</span>
+              <span class="applicant-phone">${a.phone}</span>
+            </div>
+            <button class="confirm-btn ${confirmed?'on':'off'}" onclick="toggleConfirm('${s.id}','${a.name}')">${confirmed?'확정됨':'확정하기'}</button>
+          </div>`;
+        }).join('');
+    return `<div class="slot-card">
+      <div class="slot-head">
+        <div class="slot-datetime">${fmt(s.date)} ${s.time}</div>
+        <div class="slot-meta">
+          <span class="badge ${badgeCls}">${badgeTxt}</span>
+          <button class="del-btn" onclick="deleteSlot('${s.id}')">삭제</button>
+        </div>
+      </div>
+      <div class="applicants">${appRows}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderApplicants(slots) {
+  const el = document.getElementById('applicantList');
+  const all = slots.filter(s => (s.applicants||[]).length > 0);
+  if (!all.length) { el.innerHTML = '<div class="empty">아직 신청자가 없어요</div>'; return; }
+  el.innerHTML = all.map(s =>
+    (s.applicants||[]).map(a => {
+      const confirmed = (s.confirmed||[]).includes(a.name);
+      return `<div class="slot-card">
+        <div class="slot-head">
+          <div>
+            <div class="applicant-name" style="font-size:15px;">${a.name}</div>
+            <div class="applicant-phone">${a.phone}</div>
+          </div>
+          <div class="slot-meta">
+            <span class="badge ${confirmed?'badge-has':'badge-empty'}">${confirmed?'확정':'대기'}</span>
+          </div>
+        </div>
+        <div style="font-size:13px;color:#888;margin-top:4px;">${fmt(s.date)} ${s.time}</div>
+      </div>`;
+    }).join('')
+  ).join('');
+}
+
+// 관리자: 슬롯 추가
+window.addSlot = async function() {
+  const date = document.getElementById('inpDate').value;
+  const time = document.getElementById('inpTime').value;
+  const max = parseInt(document.getElementById('inpMax').value) || 1;
+  if (!date || !time) { showToast('날짜와 시간을 입력해주세요'); return; }
+  await addDoc(collection(db, 'slots'), { date, time, max, applicants: [], confirmed: [] });
+  showToast('일정이 추가됐어요!');
+};
+
+// 관리자: 슬롯 삭제
+window.deleteSlot = async function(id) {
+  if (!confirm('이 일정을 삭제할까요?')) return;
+  await deleteDoc(doc(db, 'slots', id));
+  showToast('삭제됐어요');
+};
+
+// 관리자: 확정 토글
+window.toggleConfirm = async function(slotId, name) {
+  const snap = await getDocs(collection(db, 'slots'));
+  const slotDoc = snap.docs.find(d => d.id === slotId);
+  if (!slotDoc) return;
+  const data = slotDoc.data();
+  let confirmed = data.confirmed || [];
+  if (confirmed.includes(name)) {
+    confirmed = confirmed.filter(n => n !== name);
+  } else {
+    confirmed.push(name);
+  }
+  await updateDoc(doc(db, 'slots', slotId), { confirmed });
+};
+
+// 관리자 탭 전환
+window.adminTab = function(tab) {
+  document.querySelectorAll('.tab').forEach((b,i) => b.classList.toggle('on',(tab==='slots'&&i===0)||(tab==='applicants'&&i===1)));
+  document.getElementById('adminSlots').style.display = tab==='slots'?'block':'none';
+  document.getElementById('adminApplicants').style.display = tab==='applicants'?'block':'none';
+};
+
+// 공유 링크 복사
+window.copyGuestLink = function() {
+  const url = window.location.origin + window.location.pathname;
+  navigator.clipboard.writeText(url).then(() => showToast('링크 복사됐어요!'));
+};
+
+// ── 지인: 슬롯 불러오기
+let selectedSlotId = null;
+let guestDone = false;
+
+async function loadGuestSlots() {
+  const q = query(collection(db, 'slots'), orderBy('date'), orderBy('time'));
+  onSnapshot(q, (snap) => {
+    const slots = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    renderGuestView(slots);
+  });
+}
+
+function renderGuestView(slots) {
+  const el = document.getElementById('guestContent');
+  if (guestDone) {
+    el.innerHTML = `<div class="done-box">
+      <div class="done-circle">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6B5CE7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <div class="done-title">신청 완료!</div>
+      <div class="done-desc">강사님이 일정 확인 후<br>연락드릴 거예요 😊</div>
+    </div>`;
+    return;
+  }
+  if (!slots.length) {
+    el.innerHTML = '<div class="empty">아직 등록된 일정이 없어요.<br>조금 뒤에 다시 확인해주세요!</div>';
+    return;
+  }
+  const today = new Date().toISOString().split('T')[0];
+  const future = slots.filter(s => s.date >= today);
+  if (!future.length) {
+    el.innerHTML = '<div class="empty">현재 신청 가능한 일정이 없어요</div>';
+    return;
+  }
+  const optHtml = future.map(s => {
+    const cnt = (s.applicants||[]).length;
+    const full = cnt >= s.max;
+    const isSel = selectedSlotId === s.id;
+    return `<div class="slot-option${isSel?' selected':''}${full?' full':''}" onclick="${full?'':'selectSlot(\''+s.id+'\')'}">
+      <div>
+        <div class="slot-opt-date">${fmt(s.date)}</div>
+        <div class="slot-opt-time">${s.time}</div>
+      </div>
+      <span class="badge ${full?'badge-closed':'badge-avail'}">${full?'마감':'신청 가능'}</span>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="margin-bottom:8px;font-size:14px;font-weight:500;color:#555;">일정 선택</div>
+    ${optHtml}
+    <div class="guest-form" style="margin-top:16px;">
+      <div class="card-title">내 정보 입력</div>
+      <div class="form-row">
+        <div class="field"><label>이름</label><input type="text" id="gName" placeholder="홍길동"></div>
+        <div class="field"><label>연락처</label><input type="tel" id="gPhone" placeholder="010-0000-0000"></div>
+      </div>
+      <button class="submit-btn" onclick="submitGuest()">신청하기</button>
+    </div>`;
+}
+
+window.selectSlot = function(id) {
+  selectedSlotId = id;
+  const snap_q = query(collection(db, 'slots'), orderBy('date'), orderBy('time'));
+  getDocs(snap_q).then(snap => {
+    renderGuestView(snap.docs.map(d => ({id:d.id,...d.data()})));
+  });
+};
+
+window.submitGuest = async function() {
+  const name = document.getElementById('gName').value.trim();
+  const phone = document.getElementById('gPhone').value.trim();
+  if (!selectedSlotId) { showToast('일정을 선택해주세요'); return; }
+  if (!name) { showToast('이름을 입력해주세요'); return; }
+  if (!phone) { showToast('연락처를 입력해주세요'); return; }
+
+  const slotRef = doc(db, 'slots', selectedSlotId);
+  const snap = await getDocs(collection(db, 'slots'));
+  const slotDoc = snap.docs.find(d => d.id === selectedSlotId);
+  if (!slotDoc) { showToast('일정을 찾을 수 없어요'); return; }
+  const data = slotDoc.data();
+  if ((data.applicants||[]).length >= data.max) { showToast('이미 마감된 일정이에요'); return; }
+
+  const applicants = [...(data.applicants||[]), {name, phone}];
+  await updateDoc(slotRef, { applicants });
+  guestDone = true;
+  renderGuestView([]);
+};
+
+initView();
+</script>
+</body>
+</html>

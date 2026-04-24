@@ -135,6 +135,9 @@
 
   .loading{text-align:center;padding:40px;color:#aaa;font-size:14px;}
   .empty{text-align:center;padding:32px;color:#aaa;font-size:14px;line-height:1.7;}
+  .time-range-box{background:#fff;border:1px solid #e8e4de;border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+  .time-range-box .field{display:flex;flex-direction:column;gap:4px;}
+  .time-range-box .field label{font-size:11px;color:#888;font-weight:500;}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a1a1a;color:#fff;padding:10px 22px;border-radius:99px;font-size:13px;transition:transform 0.25s;pointer-events:none;white-space:nowrap;z-index:99;}
   .toast.show{transform:translateX(-50%) translateY(0);}
   @media(max-width:480px){.time-check-grid{grid-template-columns:repeat(4,1fr);}.form-row{flex-direction:column;}.lookup-row{flex-direction:column;}}
@@ -161,6 +164,19 @@
         <div class="link-row">
           <div class="link-url" id="guestLinkDisplay"></div>
           <button class="copy-btn" onclick="copyGuestLink()">복사</button>
+        </div>
+      </div>
+      <div class="time-range-box" id="timeRangeBox">
+        <div class="link-label" style="margin-bottom:10px;">표출 시간 범위 설정</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="field"><label>시작 시간</label>
+            <select id="rangeStart" onchange="saveTimeRange()" style="padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;"></select>
+          </div>
+          <div style="font-size:18px;color:#aaa;padding-top:16px;">~</div>
+          <div class="field"><label>종료 시간</label>
+            <select id="rangeEnd" onchange="saveTimeRange()" style="padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;"></select>
+          </div>
+          <div style="font-size:12px;color:#aaa;padding-top:16px;">저장 시 자동 반영</div>
         </div>
       </div>
       <div class="cal-wrap">
@@ -280,6 +296,50 @@ for(let h=6;h<=21;h++){ALL_TIMES.push(h+':00');ALL_TIMES.push(h+':30');}
 ALL_TIMES.push('22:00');
 
 let cachedSlots = [];
+let timeRangeStart = 6;   // 기본 06:00
+let timeRangeEnd = 22;    // 기본 22:00
+
+function getFilteredTimes(){
+  const times = [];
+  for(let h=timeRangeStart;h<=timeRangeEnd;h++){
+    if(h<timeRangeEnd||timeRangeStart===timeRangeEnd) times.push(h+':00');
+    if(h<timeRangeEnd) times.push(h+':30');
+  }
+  return times;
+}
+
+function buildRangeSelects(){
+  const hours = [];
+  for(let h=0;h<=23;h++) hours.push(h);
+  const startSel = document.getElementById('rangeStart');
+  const endSel = document.getElementById('rangeEnd');
+  if(!startSel||!endSel) return;
+  startSel.innerHTML = hours.map(h=>'<option value="'+h+'"'+(h===timeRangeStart?' selected':'')+'>'+String(h).padStart(2,'0')+':00</option>').join('');
+  endSel.innerHTML = hours.map(h=>'<option value="'+h+'"'+(h===timeRangeEnd?' selected':'')+'>'+String(h).padStart(2,'0')+':00</option>').join('');
+}
+
+window.saveTimeRange = function(){
+  const s = parseInt(document.getElementById('rangeStart').value);
+  const e = parseInt(document.getElementById('rangeEnd').value);
+  if(s>=e){showToast('종료 시간이 시작 시간보다 커야 해요');return;}
+  timeRangeStart = s;
+  timeRangeEnd = e;
+  db.collection('settings').doc('timeRange').set({start:s,end:e})
+    .then(()=>showToast('시간 범위가 저장됐어요!'))
+    .catch(e=>showToast('오류: '+e.message));
+  if(aSelDate) renderAdminDayDetail(aSelDate);
+};
+
+function loadTimeRange(cb){
+  db.collection('settings').doc('timeRange').get().then(function(doc){
+    if(doc.exists){
+      timeRangeStart = doc.data().start||6;
+      timeRangeEnd = doc.data().end||22;
+    }
+    buildRangeSelects();
+    if(cb) cb();
+  }).catch(function(){buildRangeSelects();if(cb)cb();});
+}
 let aSelDate = null;   // 관리자 선택 날짜 (일정등록)
 let aSelDate2 = null;  // 관리자 선택 날짜 (신청현황)
 let gSelDate = null;   // 지인 선택 날짜
@@ -363,7 +423,7 @@ function renderAdminDayDetail(dateStr){
   const registeredTimes = daySlots.map(s=>s.time);
   const bookedTimes = daySlots.filter(s=>(s.applicants||[]).length>0).map(s=>s.time);
   const grid = document.getElementById('timeCheckGrid');
-  grid.innerHTML = ALL_TIMES.map(function(t){
+  grid.innerHTML = getFilteredTimes().map(function(t){
     const checked = registeredTimes.includes(t);
     const hasBooking = bookedTimes.includes(t);
     return `<div class="time-check-item${hasBooking?' has-booking':''}">
@@ -582,13 +642,13 @@ function initView(){
       document.getElementById('modeBadge').textContent='강사 관리자';
       document.getElementById('modeBadge').className='mode-badge mode-admin';
       document.getElementById('guestLinkDisplay').textContent=window.location.origin+window.location.pathname;
-      listenSlots();
+      loadTimeRange(function(){ listenSlots(); });
     });
   } else {
     document.getElementById('guestView').style.display='block';
     document.getElementById('modeBadge').textContent='수업 신청';
     document.getElementById('modeBadge').className='mode-badge mode-guest';
-    listenSlots();
+    loadTimeRange(function(){ listenSlots(); });
   }
 }
 
